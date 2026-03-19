@@ -308,3 +308,58 @@ class ExerciseLog {
         source: m['source'] ?? 'manual',
       );
 }
+
+class CustomFood {
+  final int? id;
+  final String name;
+  final String category;
+  final double caloriesPer100g;
+  final double proteinPer100g;
+  final double carbsPer100g;
+  final double fatPer100g;
+  final DateTime createdAt;
+
+  const CustomFood({
+    this.id,
+    required this.name,
+    this.category = 'My Foods',
+    required this.caloriesPer100g,
+    this.proteinPer100g = 0,
+    this.carbsPer100g = 0,
+    this.fatPer100g = 0,
+    required this.createdAt,
+  });
+
+  FoodItem toFoodItem() => FoodItem(
+        barcode: 'custom_${id ?? name.toLowerCase().replaceAll(' ', '_')}',
+        name: name,
+        brand: 'My Foods',
+        caloriesPer100g: caloriesPer100g,
+        proteinPer100g: proteinPer100g,
+        carbsPer100g: carbsPer100g,
+        fatPer100g: fatPer100g,
+      );
+
+  Map<String, dynamic> toMap() => {
+        if (id != null) 'id': id,
+        'name': name,
+        'category': category,
+        'caloriesPer100g': caloriesPer100g,
+        'proteinPer100g': proteinPer100g,
+        'carbsPer100g': carbsPer100g,
+        'fatPer100g': fatPer100g,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory CustomFood.fromMap(Map<String, dynamic> m) => CustomFood(
+        id: m['id'],
+        name: m['name'] ?? '',
+        category: m['category'] ?? 'My Foods',
+        caloriesPer100g: (m['caloriesPer100g'] ?? 0).toDouble(),
+        proteinPer100g: (m['proteinPer100g'] ?? 0).toDouble(),
+        carbsPer100g: (m['carbsPer100g'] ?? 0).toDouble(),
+        fatPer100g: (m['fatPer100g'] ?? 0).toDouble(),
+        createdAt: DateTime.parse(
+            m['createdAt'] ?? DateTime.now().toIso8601String()),
+      );
+}

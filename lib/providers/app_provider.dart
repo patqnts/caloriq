@@ -38,6 +38,9 @@ class AppProvider extends ChangeNotifier {
   double get todayCarbs   => _foodLogs.fold(0, (s, l) => s + l.carbs);
   double get todayFat     => _foodLogs.fold(0, (s, l) => s + l.fat);
 
+  List<CustomFood> _customFoods = [];
+  List<CustomFood> get customFoods => _customFoods;
+
   WeightEntry? get todayWeight {
     final ds = _selectedDate.toIso8601String().substring(0, 10);
     try {
@@ -57,6 +60,7 @@ class AppProvider extends ChangeNotifier {
       _exerciseLogs = await DatabaseService.instance.getExerciseLogsForDate(_selectedDate);
       _weightEntries = await DatabaseService.instance.getWeightEntries();
       _weeklyCalories = await DatabaseService.instance.getCaloriesLast7Days();
+      _customFoods = await DatabaseService.instance.getCustomFoods();
     } catch (e) {
       debugPrint('init error: $e');
     } finally {
@@ -161,4 +165,25 @@ class AppProvider extends ChangeNotifier {
 
   List<FoodLog> getFoodLogsByMeal(MealType meal) =>
       _foodLogs.where((l) => l.mealType == meal).toList();
+
+  Future<void> loadCustomFoods() async {
+  _customFoods = await DatabaseService.instance.getCustomFoods();
+  notifyListeners();
+  }
+
+  Future<void> saveCustomFood(CustomFood food) async {
+    await DatabaseService.instance.saveCustomFood(food);
+    await loadCustomFoods();
+  }
+
+  Future<void> deleteCustomFood(int id) async {
+    await DatabaseService.instance.deleteCustomFood(id);
+    await loadCustomFoods();
+  }
+
+  Future<void> updateCustomFood(CustomFood food) async {
+    await DatabaseService.instance.updateCustomFood(food);
+    await loadCustomFoods();
+  }
+
 }

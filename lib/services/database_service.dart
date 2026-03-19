@@ -70,6 +70,18 @@ class DatabaseService {
             lastUsed INTEGER
           )
         ''');
+        await db.execute('''
+          CREATE TABLE custom_foods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            category TEXT,
+            caloriesPer100g REAL,
+            proteinPer100g REAL,
+            carbsPer100g REAL,
+            fatPer100g REAL,
+            createdAt TEXT
+          )
+        ''');
       },
     );
   }
@@ -163,5 +175,28 @@ class DatabaseService {
       result[dateStr] = foodCals - exerciseCals;
     }
     return result;
+  }
+
+  Future<void> saveCustomFood(CustomFood food) async {
+    final d = await db;
+    await d.insert('custom_foods', food.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteCustomFood(int id) async {
+    final d = await db;
+    await d.delete('custom_foods', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateCustomFood(CustomFood food) async {
+    final d = await db;
+    await d.update('custom_foods', food.toMap(),
+        where: 'id = ?', whereArgs: [food.id]);
+  }
+
+  Future<List<CustomFood>> getCustomFoods() async {
+    final d = await db;
+    final rows = await d.query('custom_foods', orderBy: 'name ASC');
+    return rows.map(CustomFood.fromMap).toList();
   }
 }

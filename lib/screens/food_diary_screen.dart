@@ -380,6 +380,7 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
   List<FoodItem> _localResults = [];
   List<FoodItem> _usdaResults  = [];
   List<FoodItem> _recents      = [];
+  List<FoodItem> _myFoods = [];
   bool _usdaLoading = false;
   FoodItem? _selected;
   final _amountCtrl = TextEditingController(text: '100');
@@ -389,6 +390,12 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
   void initState() {
     super.initState();
     _loadRecents();
+    _loadMyFoods();
+  }
+
+  void _loadMyFoods() {
+    final customs = widget.provider.customFoods;
+    setState(() => _myFoods = customs.map((c) => c.toFoodItem()).toList());
   }
 
   Future<void> _loadRecents() async {
@@ -402,10 +409,14 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
       setState(() { _localResults = []; _usdaResults = []; _usdaLoading = false; });
       return;
     }
+    final ql = q.toLowerCase();
     setState(() {
-      _localResults = FoodApiService.searchLocal(q);
-      _usdaLoading  = true;
-      _usdaResults  = [];
+      _localResults = [
+        ..._myFoods.where((f) => f.name.toLowerCase().contains(ql)),
+        ...FoodApiService.searchLocal(q),
+      ];
+      _usdaLoading = true;
+      _usdaResults = [];
     });
     _usdaDebounce = Timer(const Duration(milliseconds: 600), () async {
       final results = await FoodApiService.searchUsda(q);
@@ -491,6 +502,36 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
       controller: scrollCtrl,
       padding: const EdgeInsets.all(16),
       children: [
+        if (_myFoods.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SectionLabel('My Foods'),
+              GestureDetector(
+                onTap: () => _openMyFoodsManager(context),
+                child: Text('Manage',
+                    style: TextStyle(
+                        color: AppTheme.accent_(isDark), fontSize: 13)),
+              ),
+            ],
+          ),
+          ..._myFoods.map(_foodTile),
+          const SizedBox(height: 16),
+        ] else ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SectionLabel('My Foods'),
+              GestureDetector(
+                onTap: () => _openMyFoodsManager(context),
+                child: Text('Add food',
+                    style: TextStyle(
+                        color: AppTheme.accent_(isDark), fontSize: 13)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         if (_recents.isNotEmpty) ...[
           const SectionLabel('Recent'),
           ..._recents.map(_foodTile),
@@ -591,6 +632,22 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
     ));
     if (mounted) Navigator.pop(context);
   }
+
+  void _openMyFoodsManager(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: AppTheme.surface_(isDark),
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (_) => _MyFoodsManager(
+      provider: widget.provider,
+      onChanged: _loadMyFoods,
+    ),
+  );
+}
+
 }
 
 class _AmountEntry extends StatefulWidget {
@@ -1112,5 +1169,326 @@ class _ExerciseSheetState extends State<_ExerciseSheet> {
         ],
       ),
     );
+  }
+}
+
+// ── My Foods Manager ──────────────────────────────────────────────────────────
+
+class _MyFoodsManager extends StatefulWidget {
+  final AppProvider provider;
+  final VoidCallback onChanged;
+  const _MyFoodsManager({required this.provider, required this.onChanged});
+
+  @override
+  State<_MyFoodsManager> createState() => _MyFoodsManagerState();
+}
+
+class _MyFoodsManagerState extends State<_MyFoodsManager> {
+  @override
+  Widget build(BuildContext context) {
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final customs = widget.provider.customFoods;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.85,
+      maxChildSize: 0.95,
+      builder: (ctx, scrollCtrl) => Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 8, bottom: 4),
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.border_(isDark),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('My Foods',
+                    style: Theme.of(context).textTheme.headlineMedium),
+                TextButton.icon(
+                  onPressed: () => _showAddEditSheet(context),
+                  icon: Icon(Icons.add, color: AppTheme.accent_(isDark)),
+                  label: Text('Add',
+                      style: TextStyle(color: AppTheme.accent_(isDark))),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: customs.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.restaurant_menu_outlined,
+                            color: AppTheme.textMuted_(isDark), size: 48),
+                        const SizedBox(height: 12),
+                        Text('No custom foods yet',
+                            style: TextStyle(
+                                color: AppTheme.textMuted_(isDark),
+                                fontSize: 15)),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => _showAddEditSheet(context),
+                          child: Text('Add your first food',
+                              style: TextStyle(
+                                  color: AppTheme.accent_(isDark))),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: customs.length,
+                    separatorBuilder: (_, __) =>
+                        Divider(height: 1, color: AppTheme.border_(isDark)),
+                    itemBuilder: (_, i) {
+                      final food = customs[i];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(food.name,
+                            style: TextStyle(
+                                color: AppTheme.textPrimary_(isDark),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500)),
+                        subtitle: Text(
+                          '${food.caloriesPer100g.round()} kcal  ·  P:${food.proteinPer100g.toStringAsFixed(1)}  C:${food.carbsPer100g.toStringAsFixed(1)}  F:${food.fatPer100g.toStringAsFixed(1)}',
+                          style: TextStyle(
+                              color: AppTheme.textMuted_(isDark),
+                              fontSize: 12),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit_outlined,
+                                  color: AppTheme.textMuted_(isDark),
+                                  size: 18),
+                              onPressed: () =>
+                                  _showAddEditSheet(context, existing: food),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete_outline,
+                                  color: AppTheme.red_(isDark), size: 18),
+                              onPressed: () async {
+                                await widget.provider
+                                    .deleteCustomFood(food.id!);
+                                widget.onChanged();
+                                setState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAddEditSheet(BuildContext context,
+      {CustomFood? existing}) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface_(isDark),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _AddCustomFoodSheet(
+        provider: widget.provider,
+        existing: existing,
+        onSaved: () {
+          widget.onChanged();
+          setState(() {});
+        },
+      ),
+    );
+  }
+}
+
+// ── Add / Edit Custom Food Sheet ──────────────────────────────────────────────
+
+class _AddCustomFoodSheet extends StatefulWidget {
+  final AppProvider provider;
+  final CustomFood? existing;
+  final VoidCallback onSaved;
+
+  const _AddCustomFoodSheet({
+    required this.provider,
+    this.existing,
+    required this.onSaved,
+  });
+
+  @override
+  State<_AddCustomFoodSheet> createState() => _AddCustomFoodSheetState();
+}
+
+class _AddCustomFoodSheetState extends State<_AddCustomFoodSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _calCtrl;
+  late final TextEditingController _proteinCtrl;
+  late final TextEditingController _carbsCtrl;
+  late final TextEditingController _fatCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _nameCtrl   = TextEditingController(text: e?.name ?? '');
+    _calCtrl    = TextEditingController(
+        text: e?.caloriesPer100g.toString() ?? '');
+    _proteinCtrl = TextEditingController(
+        text: e?.proteinPer100g.toString() ?? '');
+    _carbsCtrl  = TextEditingController(
+        text: e?.carbsPer100g.toString() ?? '');
+    _fatCtrl    = TextEditingController(
+        text: e?.fatPer100g.toString() ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose(); _calCtrl.dispose();
+    _proteinCtrl.dispose(); _carbsCtrl.dispose(); _fatCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final isEditing = widget.existing != null;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24, right: 24, top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isEditing ? 'Edit food' : 'Add custom food',
+              style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 4),
+          Text('Values are per 100g',
+              style: TextStyle(
+                  color: AppTheme.textMuted_(isDark), fontSize: 12)),
+          const SizedBox(height: 20),
+
+          // Name
+          TextField(
+            controller: _nameCtrl,
+            autofocus: true,
+            style: TextStyle(color: AppTheme.textPrimary_(isDark)),
+            decoration: InputDecoration(
+              labelText: 'Food name',
+              labelStyle: TextStyle(color: AppTheme.textMuted_(isDark)),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Calories
+          TextField(
+            controller: _calCtrl,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            style: TextStyle(color: AppTheme.textPrimary_(isDark)),
+            decoration: InputDecoration(
+              labelText: 'Calories (kcal)',
+              labelStyle: TextStyle(color: AppTheme.textMuted_(isDark)),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Macros row
+          Row(children: [
+            Expanded(child: TextField(
+              controller: _proteinCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(color: AppTheme.textPrimary_(isDark)),
+              decoration: InputDecoration(
+                labelText: 'Protein (g)',
+                labelStyle:
+                    TextStyle(color: AppTheme.textMuted_(isDark)),
+              ),
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: TextField(
+              controller: _carbsCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(color: AppTheme.textPrimary_(isDark)),
+              decoration: InputDecoration(
+                labelText: 'Carbs (g)',
+                labelStyle:
+                    TextStyle(color: AppTheme.textMuted_(isDark)),
+              ),
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: TextField(
+              controller: _fatCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(color: AppTheme.textPrimary_(isDark)),
+              decoration: InputDecoration(
+                labelText: 'Fat (g)',
+                labelStyle:
+                    TextStyle(color: AppTheme.textMuted_(isDark)),
+              ),
+            )),
+          ]),
+          const SizedBox(height: 24),
+
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.accent_(isDark),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _save,
+              child: Text(isEditing ? 'Save changes' : 'Add food',
+                  style:
+                      const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    if (_nameCtrl.text.trim().isEmpty) return;
+    final food = CustomFood(
+      id: widget.existing?.id,
+      name: _nameCtrl.text.trim(),
+      caloriesPer100g: double.tryParse(_calCtrl.text) ?? 0,
+      proteinPer100g:  double.tryParse(_proteinCtrl.text) ?? 0,
+      carbsPer100g:    double.tryParse(_carbsCtrl.text) ?? 0,
+      fatPer100g:      double.tryParse(_fatCtrl.text) ?? 0,
+      createdAt: widget.existing?.createdAt ?? DateTime.now(),
+    );
+
+    if (widget.existing != null) {
+      await widget.provider.updateCustomFood(food);
+    } else {
+      await widget.provider.saveCustomFood(food);
+    }
+
+    widget.onSaved();
+    if (mounted) Navigator.pop(context);
   }
 }
