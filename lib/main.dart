@@ -136,12 +136,6 @@ class _OnboardingScreenState extends State<_OnboardingScreen> {
   String _gender        = 'male';
   String _activityLevel = 'sedentary';
 
-  bool get _isGaining {
-    final c = double.tryParse(_currentWeightCtrl.text) ?? 0;
-    final t = double.tryParse(_targetWeightCtrl.text) ?? 0;
-    return t > c;
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
